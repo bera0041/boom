@@ -192,6 +192,7 @@ export default function Dashboard() {
           <AgentCard agentState={agentState} poseDetected={poseDetected} />
           <RecoveryTimer agentState={agentState} />
           <AlertPanel alert={latestAlert} onAcknowledge={handleAcknowledge} />
+          <SecurityStatus connected={connected} />
           <FutureAgents />
         </div>
 
