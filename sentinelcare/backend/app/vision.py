@@ -61,9 +61,9 @@ class PoseTracker:
     def __init__(
         self,
         model_path: str | None = None,
-        num_poses: int = 4,
-        min_detection_confidence: float = 0.5,
-        min_tracking_confidence: float = 0.5,
+        num_poses: int = 6,
+        min_detection_confidence: float = 0.3,
+        min_tracking_confidence: float = 0.3,
     ) -> None:
         if model_path is None:
             # Look for model relative to this file or in backend root
@@ -90,7 +90,7 @@ class PoseTracker:
             running_mode=mp.tasks.vision.RunningMode.VIDEO,
             num_poses=num_poses,
             min_pose_detection_confidence=min_detection_confidence,
-            min_pose_presence_confidence=min_detection_confidence,
+            min_pose_presence_confidence=0.3,
             min_tracking_confidence=min_tracking_confidence,
             output_segmentation_masks=False,
         )
