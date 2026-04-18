@@ -101,10 +101,24 @@ export function useUserLocation() {
             lng: position.coords.longitude,
           });
         },
-        (err) => {
+        (err: GeolocationPositionError) => {
           setGeolocating(false);
-          console.error('Geolocation error:', err);
-          setError('Failed to get current location. Please enter address manually.');
+          let errorMessage = 'Failed to get current location. Please enter address manually.';
+          
+          switch (err.code) {
+            case err.PERMISSION_DENIED:
+              errorMessage = 'Location access denied. Please enable location permissions or enter address manually.';
+              break;
+            case err.POSITION_UNAVAILABLE:
+              errorMessage = 'Location unavailable. Please enter address manually.';
+              break;
+            case err.TIMEOUT:
+              errorMessage = 'Location request timed out. Please try again or enter address manually.';
+              break;
+          }
+          
+          console.error('Geolocation error:', err.code, err.message);
+          setError(errorMessage);
           resolve(null);
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
