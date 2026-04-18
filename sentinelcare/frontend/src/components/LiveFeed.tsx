@@ -1,16 +1,24 @@
 "use client";
 
-import { useState } from "react";
-
 interface LiveFeedProps {
   frame: string | null;
   poseDetected: boolean;
   connected: boolean;
   numPeople: number;
+  recordingEnabled?: boolean;
+  onToggleRecording?: () => void;
 }
 
-export default function LiveFeed({ frame, poseDetected, connected, numPeople }: LiveFeedProps) {
-  const [isPaused, setIsPaused] = useState(false);
+export default function LiveFeed({ 
+  frame, 
+  poseDetected, 
+  connected, 
+  numPeople,
+  recordingEnabled = true,
+  onToggleRecording,
+}: LiveFeedProps) {
+  // Use persisted setting - recording off = isPaused
+  const isPaused = !recordingEnabled;
 
   return (
     <div className="glass-card overflow-hidden flex flex-col h-full">
@@ -58,12 +66,13 @@ export default function LiveFeed({ frame, poseDetected, connected, numPeople }: 
           </div>
           {/* Privacy / Pause toggle */}
           <button
-            onClick={() => setIsPaused(!isPaused)}
+            onClick={onToggleRecording}
+            disabled={!onToggleRecording}
             className={`p-1.5 rounded-lg transition-colors ${
               isPaused
                 ? "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"
                 : "bg-slate-700/50 text-slate-400 hover:bg-slate-600/50 hover:text-slate-300"
-            }`}
+            } ${!onToggleRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
             title={isPaused ? "Resume monitoring" : "Pause monitoring (Privacy mode)"}
           >
             {isPaused ? (
@@ -94,8 +103,9 @@ export default function LiveFeed({ frame, poseDetected, connected, numPeople }: 
               <p className="text-xs text-slate-500 mt-1">Monitoring paused for privacy</p>
             </div>
             <button
-              onClick={() => setIsPaused(false)}
-              className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium transition-colors"
+              onClick={onToggleRecording}
+              disabled={!onToggleRecording}
+              className={`px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium transition-colors ${!onToggleRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               Resume Monitoring
             </button>

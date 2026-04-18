@@ -14,6 +14,7 @@ import FutureAgents from "@/components/FutureAgents";
 import ConsentModal from "@/components/ConsentModal";
 import PrivacyStatus from "@/components/PrivacyStatus";
 import SecurityStatus from "@/components/SecurityStatus";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws";
 
@@ -35,6 +36,14 @@ export default function Dashboard() {
     numPeople,
     sendMessage,
   } = useWebSocket(WS_URL);
+
+  // User settings for privacy preferences
+  const {
+    settings,
+    loading: settingsLoading,
+    toggleRecording,
+    togglePrivacyMode,
+  } = useUserSettings();
 
   // Check authentication and consent status
   useEffect(() => {
@@ -128,7 +137,13 @@ export default function Dashboard() {
           <div className="flex items-center gap-4">
             {/* Privacy Status Indicators */}
             <div className="hidden md:block">
-              <PrivacyStatus connected={connected} />
+              <PrivacyStatus 
+                connected={connected} 
+                settings={settings}
+                onToggleRecording={toggleRecording}
+                onTogglePrivacyMode={togglePrivacyMode}
+                loading={settingsLoading}
+              />
             </div>
 
             {/* User Menu */}
@@ -162,7 +177,14 @@ export default function Dashboard() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-0">
         {/* Left: Live feed */}
         <div className="lg:col-span-8 flex flex-col min-h-[420px]">
-          <LiveFeed frame={frame} poseDetected={poseDetected} connected={connected} numPeople={numPeople} />
+          <LiveFeed 
+            frame={frame} 
+            poseDetected={poseDetected} 
+            connected={connected} 
+            numPeople={numPeople}
+            recordingEnabled={settings?.recording_enabled ?? true}
+            onToggleRecording={toggleRecording}
+          />
         </div>
 
         {/* Right sidebar */}
@@ -194,6 +216,11 @@ export default function Dashboard() {
       {/* Bottom: Event Log */}
       <div className="h-[200px] shrink-0">
         <EventLog events={events} />
+      </div>
+
+      {/* Security Status - Below Event Timeline */}
+      <div className="shrink-0">
+        <SecurityStatus connected={connected} />
       </div>
       </main>
     </>
