@@ -173,10 +173,13 @@ export default function Dashboard() {
           <FutureAgents />
         </div>
 
+      </div>
+
       {/* Bottom: Event Log */}
       <div className="h-[200px] shrink-0">
         <EventLog events={events} />
       </div>
-    </main>
+      </main>
+    </>
   );
 }

@@ -13,22 +13,6 @@ export default function LiveFeed({ frame, poseDetected, connected, numPeople }: 
   const [isPaused, setIsPaused] = useState(false);
 
   return (
-    <div className="glass-card overflow-hidden flex flex-col h-full group">
-      {/* Header bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.04]">
-        <div className="flex items-center gap-2.5">
-          <div className="relative flex items-center justify-center">
-            <div
-              className={`w-2 h-2 rounded-full ${
-                connected
-                  ? "bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-                  : "bg-red-400 animate-pulse"
-              }`}
-            />
-          </div>
-          <span className="section-label">Live Feed</span>
-        </div>
-        <div className="flex items-center gap-2.5">
     <div className="glass-card overflow-hidden flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
@@ -41,7 +25,6 @@ export default function LiveFeed({ frame, poseDetected, connected, numPeople }: 
           <span className="text-sm font-semibold text-slate-300 tracking-wide uppercase">
             Live Feed
           </span>
-          {/* LIVE indicator */}
           {connected && !isPaused && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/30">
               <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
@@ -50,7 +33,6 @@ export default function LiveFeed({ frame, poseDetected, connected, numPeople }: 
           )}
         </div>
         <div className="flex items-center gap-3">
-          {/* AI Processing indicator */}
           {poseDetected && connected && (
             <span className="flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -74,30 +56,12 @@ export default function LiveFeed({ frame, poseDetected, connected, numPeople }: 
             <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
             <span className="text-slate-400">CAM-01</span>
           </div>
-        </div>
-      </div>
-
-      {/* Video area */}
-      <div className="relative flex-1 bg-black/50 flex items-center justify-center min-h-[300px]">
-        {frame ? (
-          <>
-            <img
-              src={`data:image/jpeg;base64,${frame}`}
-              alt="Live camera feed with pose overlay"
-              className="w-full h-full object-contain"
-              style={{ imageRendering: "auto" }}
-            />
-            {/* Subtle scanline overlay */}
-            <div className="absolute inset-0 scanline-overlay" />
-          </>
-          <span className="text-xs text-slate-500">Camera 1</span>
-          
-          {/* Privacy Mode Toggle */}
+          {/* Privacy / Pause toggle */}
           <button
             onClick={() => setIsPaused(!isPaused)}
             className={`p-1.5 rounded-lg transition-colors ${
-              isPaused 
-                ? "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30" 
+              isPaused
+                ? "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"
                 : "bg-slate-700/50 text-slate-400 hover:bg-slate-600/50 hover:text-slate-300"
             }`}
             title={isPaused ? "Resume monitoring" : "Pause monitoring (Privacy mode)"}
@@ -168,8 +132,7 @@ export default function LiveFeed({ frame, poseDetected, connected, numPeople }: 
             <div className="flex flex-col items-center gap-3">
               <svg className="w-6 h-6 text-amber-400 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                <path className="opacity-75" fill="currentColor"
-                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
               </svg>
               <span className="text-sm font-medium text-amber-400/90">Reconnecting</span>
             </div>
@@ -181,18 +144,17 @@ export default function LiveFeed({ frame, poseDetected, connected, numPeople }: 
         <div className="absolute top-3 right-3 w-4 h-4 border-r-2 border-t-2 border-cyan-500/20 rounded-tr" />
         <div className="absolute bottom-3 left-3 w-4 h-4 border-l-2 border-b-2 border-cyan-500/20 rounded-bl" />
         <div className="absolute bottom-3 right-3 w-4 h-4 border-r-2 border-b-2 border-cyan-500/20 rounded-br" />
+
         {/* Bottom overlay: monitoring indicators */}
         {connected && !isPaused && (
           <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {/* Edge processing badge */}
               <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-[10px] font-medium text-emerald-400">
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
                 Local Processing
               </span>
-              {/* No recording badge */}
               <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-[10px] font-medium text-emerald-400">
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
