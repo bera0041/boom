@@ -149,33 +149,36 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Mobile Privacy Status */}
-        <div className="md:hidden">
-          <PrivacyStatus connected={connected} />
+        {/* Connection status pill */}
+        <div className="stat-pill">
+          <div className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]" : "bg-red-400 animate-pulse"}`} />
+          <span className={`text-[11px] ${connected ? "text-slate-400" : "text-red-400"}`}>
+            {connected ? "Live" : "Offline"}
+          </span>
         </div>
 
-        {/* Main grid */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
-          {/* Left: Live feed (takes 2 cols) */}
-          <div className="lg:col-span-2 flex flex-col min-h-[400px]">
-            <LiveFeed frame={frame} poseDetected={poseDetected} connected={connected} numPeople={numPeople} />
-          </div>
-
-          {/* Right: Status + Agent + Timer + Security */}
-          <div className="flex flex-col gap-4 min-h-0 overflow-y-auto">
-            <StatusBadge agentState={agentState} />
-            <AgentCard agentState={agentState} poseDetected={poseDetected} />
-            <RecoveryTimer agentState={agentState} />
-            <AlertPanel alert={latestAlert} onAcknowledge={handleAcknowledge} />
-            <SecurityStatus connected={connected} />
-            <FutureAgents />
-          </div>
+      {/* Main grid */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-0">
+        {/* Left: Live feed */}
+        <div className="lg:col-span-8 flex flex-col min-h-[420px]">
+          <LiveFeed frame={frame} poseDetected={poseDetected} connected={connected} numPeople={numPeople} />
         </div>
 
-        {/* Bottom: Event Log */}
-        <div className="h-[220px] shrink-0">
-          <EventLog events={events} />
+        {/* Right sidebar */}
+        <div className="lg:col-span-4 flex flex-col gap-4 min-h-0 overflow-y-auto pr-0.5">
+          <StatusBadge agentState={agentState} />
+          <AgentCard agentState={agentState} poseDetected={poseDetected} />
+          <RecoveryTimer agentState={agentState} />
+          <AlertPanel alert={latestAlert} onAcknowledge={handleAcknowledge} />
+          <FutureAgents />
         </div>
+
+      </div>
+
+      {/* Bottom: Event Log */}
+      <div className="h-[200px] shrink-0">
+        <EventLog events={events} />
+      </div>
       </main>
     </>
   );
