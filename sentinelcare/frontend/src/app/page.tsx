@@ -24,6 +24,9 @@ export default function Dashboard() {
   const [showConsent, setShowConsent] = useState(false);
   const [consentChecked, setConsentChecked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [enabledAgents, setEnabledAgents] = useState<Set<string>>(
+    new Set(["FallGuard", "Seizure", "Stroke"])
+  );
 
   const {
     connected,
@@ -90,6 +93,42 @@ export default function Dashboard() {
 
   const handleConsentGiven = () => {
     setShowConsent(false);
+  };
+
+  const toggleAgent = (agentName: string) => {
+    setEnabledAgents((prev) => {
+      const updated = new Set(prev);
+      const isCurrentlyEnabled = updated.has(agentName);
+      
+      if (isCurrentlyEnabled) {
+        updated.delete(agentName);
+      } else {
+        updated.add(agentName);
+      }
+      
+      // Send toggle to backend
+      sendMessage({
+        type: "toggle_agent",
+        agent: agentName,
+        enabled: !isCurrentlyEnabled,
+      });
+      
+      return updated;
+    });
+  };
+
+  const resetAllAgents = () => {
+    const allAgents = ["FallGuard", "Seizure", "Stroke"];
+    setEnabledAgents(new Set(allAgents));
+    
+    // Send enable message for each agent
+    allAgents.forEach(agentName => {
+      sendMessage({
+        type: "toggle_agent",
+        agent: agentName,
+        enabled: true,
+      });
+    });
   };
 
   // Show loading while checking auth
@@ -190,20 +229,51 @@ export default function Dashboard() {
         {/* Right sidebar */}
         <div className="lg:col-span-4 flex flex-col gap-4 min-h-0 overflow-y-auto pr-0.5">
           <StatusBadge agentState={agentState} />
-          <AgentCard agentState={agentState} poseDetected={poseDetected} />
           <RecoveryTimer agentState={agentState} />
           <AlertPanel alert={latestAlert} onAcknowledge={handleAcknowledge} />
           
           {/* Multi-Agent Cards */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-slate-300 px-1">Agent Modules</h3>
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-sm font-semibold text-slate-300">Agent Modules</h3>
+              <button
+                onClick={resetAllAgents}
+                className="text-[10px] px-2 py-1 rounded bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-slate-300 transition-colors"
+                title="Enable all agents"
+              >
+                Reset
+              </button>
+            </div>
             {agents.length > 0 ? (
               agents.map((agent) => (
-                <AgentCard 
-                  key={agent.agent_name} 
-                  agentState={agent} 
-                  poseDetected={poseDetected} 
-                />
+                <div key={agent.agent_name} className={`space-y-1.5 transition-opacity ${
+                  enabledAgents.has(agent.agent_name) ? "opacity-100" : "opacity-50"
+                }`}>
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                      {enabledAgents.has(agent.agent_name) ? "Enabled" : "Disabled"}
+                    </span>
+                    <button
+                      onClick={() => toggleAgent(agent.agent_name)}
+                      className={`w-9 h-5 rounded-full transition-all flex items-center ${
+                        enabledAgents.has(agent.agent_name)
+                          ? "bg-emerald-500/30 border border-emerald-500/50"
+                          : "bg-slate-700/50 border border-slate-600/50"
+                      }`}
+                      title={`${enabledAgents.has(agent.agent_name) ? "Disable" : "Enable"} ${agent.agent_name}`}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                          enabledAgents.has(agent.agent_name) ? "translate-x-4" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <AgentCard 
+                    agentState={agent} 
+                    poseDetected={poseDetected && enabledAgents.has(agent.agent_name)}
+                  />
+                </div>
               ))
             ) : (
               <FutureAgents />

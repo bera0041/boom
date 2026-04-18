@@ -36,6 +36,17 @@ class AgentOrchestrator:
         self._agents[name] = agent
         self._previous_states[name] = AgentStateName.NORMAL
 
+    def deregister_agent(self, name: str) -> None:
+        """Deregister an agent from the orchestrator.
+        
+        Args:
+            name: Unique identifier for the agent to remove
+        """
+        if name in self._agents:
+            del self._agents[name]
+            if name in self._previous_states:
+                del self._previous_states[name]
+
     def update(self, features: PoseFeatures, pose_detected: bool) -> list[AgentState]:
         """Update all registered agents and return their states.
         

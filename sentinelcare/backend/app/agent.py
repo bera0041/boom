@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
+from typing import Optional
 
 from .agent_base import BaseAgent
 from .models import AgentState, AgentStateName, Event, Alert, PoseFeatures
@@ -19,9 +20,17 @@ class FallGuardAgent(BaseAgent):
 
     The agent evaluates multiple weighted signals each frame and uses a
     confidence score to decide on state transitions.
+    
+    Optionally supports ML confidence boosting for improved accuracy.
     """
 
-    def __init__(self, recovery_window: float = 10.0, confidence_threshold: float = 0.55) -> None:
+    def __init__(
+        self, 
+        recovery_window: float = 10.0, 
+        confidence_threshold: float = 0.55,
+        use_ml_boost: bool = False,
+        ml_weight: float = 0.3
+    ) -> None:
         super().__init__(recovery_window, confidence_threshold)
         
         # FallGuard-specific state
@@ -35,6 +44,13 @@ class FallGuardAgent(BaseAgent):
 
         # Cooldown after recovery
         self._recovery_cooldown_until: float = 0.0
+        
+        # ML confidence booster (optional)
+        self._use_ml_boost = use_ml_boost
+        self._ml_booster: Optional['MLConfidenceBooster'] = None
+        if use_ml_boost:
+            from .ml_classifier import MLConfidenceBooster
+            self._ml_booster = MLConfidenceBooster(ml_weight=ml_weight)
 
     # ------------------------------------------------------------------
     # Public API (BaseAgent implementation)
@@ -152,6 +168,8 @@ class FallGuardAgent(BaseAgent):
         
         Requires rapid downward velocity as a prerequisite — without it,
         normal sitting/crouching won't trigger a fall event.
+        
+        Optionally boosts confidence with ML predictions if enabled.
         """
         # GATE: Must have meaningful downward velocity to even consider a fall
         if f.velocity < 0.02:
@@ -176,7 +194,13 @@ class FallGuardAgent(BaseAgent):
             if drop > 0.12:
                 score += min(0.20, (drop - 0.12) * 3)
 
-        return min(1.0, score)
+        rule_confidence = min(1.0, score)
+        
+        # Boost with ML if enabled
+        if self._use_ml_boost and self._ml_booster:
+            return self._ml_booster.boost_confidence("FallGuard", rule_confidence, f)
+        
+        return rule_confidence
 
     def _compute_recovery_score(self, f: PoseFeatures) -> float:
         """Assess whether the subject has recovered (0–1)."""

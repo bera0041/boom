@@ -96,6 +96,21 @@ async def update_config(new_config: AppConfig):
     return {"status": "updated", "config": config.model_dump()}
 
 
+@app.post("/agent/toggle")
+async def toggle_agent(agent_name: str, enabled: bool):
+    """Toggle an agent on/off."""
+    global config
+    if agent_name in config.enabled_agents:
+        config.enabled_agents[agent_name] = enabled
+        return {
+            "status": "toggled",
+            "agent": agent_name,
+            "enabled": enabled,
+            "config": config.model_dump()
+        }
+    return {"status": "error", "message": f"Unknown agent: {agent_name}"}
+
+
 @app.get("/config")
 async def get_config():
     return config.model_dump()
@@ -183,39 +198,48 @@ async def _vision_loop(ws: WebSocket) -> None:
     # Create AgentOrchestrator and register all agents
     orchestrator = AgentOrchestrator()
     
-    # Register FallGuardAgent for backward compatibility
-    fall_agent = FallGuardAgent(
-        recovery_window=config.recovery_window,
-        confidence_threshold=config.fall_confidence_threshold,
-    )
-    orchestrator.register_agent("FallGuard", fall_agent)
+    def rebuild_orchestrator():
+        """Rebuild orchestrator based on current config."""
+        nonlocal orchestrator
+        # Clear existing agents
+        orchestrator = AgentOrchestrator()
+        
+        # Register FallGuardAgent if enabled
+        if config.enabled_agents.get("FallGuard", True):
+            fall_agent = FallGuardAgent(
+                recovery_window=config.recovery_window,
+                confidence_threshold=config.fall_confidence_threshold,
+                use_ml_boost=config.use_ml_boost,
+                ml_weight=config.ml_weight,
+            )
+            orchestrator.register_agent("FallGuard", fall_agent)
+        
+        # Register SeizureAgent if enabled
+        if config.enabled_agents.get("Seizure", True):
+            seizure_agent = SeizureAgent(
+                recovery_window=config.seizure_config.recovery_window,
+                confidence_threshold=config.seizure_config.confidence_threshold,
+                recovery_threshold=config.seizure_config.recovery_threshold,
+                history_window=config.seizure_config.history_window,
+            )
+            orchestrator.register_agent("Seizure", seizure_agent)
+        
+        # Register StrokeAgent if enabled
+        if config.enabled_agents.get("Stroke", True):
+            stroke_agent = StrokeAgent(
+                recovery_window=config.stroke_config.recovery_window,
+                asymmetry_threshold=config.stroke_config.asymmetry_threshold,
+                motion_threshold=config.stroke_config.motion_threshold,
+                recovery_asymmetry_threshold=config.stroke_config.recovery_asymmetry_threshold,
+                recovery_motion_threshold=config.stroke_config.recovery_motion_threshold,
+            )
+            orchestrator.register_agent("Stroke", stroke_agent)
     
-    # Register specialized agents with their configurations
-    seizure_agent = SeizureAgent(
-        recovery_window=config.seizure_config.recovery_window,
-        confidence_threshold=config.seizure_config.confidence_threshold,
-        recovery_threshold=config.seizure_config.recovery_threshold,
-        history_window=config.seizure_config.history_window,
-    )
-    orchestrator.register_agent("Seizure", seizure_agent)
+    # Initial build
+    rebuild_orchestrator()
     
-    stroke_agent = StrokeAgent(
-        recovery_window=config.stroke_config.recovery_window,
-        asymmetry_threshold=config.stroke_config.asymmetry_threshold,
-        motion_threshold=config.stroke_config.motion_threshold,
-        recovery_asymmetry_threshold=config.stroke_config.recovery_asymmetry_threshold,
-        recovery_motion_threshold=config.stroke_config.recovery_motion_threshold,
-    )
-    orchestrator.register_agent("Stroke", stroke_agent)
-    
-    wandering_agent = WanderingAgent(
-        recovery_window=config.wandering_config.recovery_window,
-        boundary_zone=config.wandering_config.boundary_zone,
-        exit_threshold=config.wandering_config.exit_threshold,
-        pacing_threshold=config.wandering_config.pacing_threshold,
-        pacing_window=config.wandering_config.pacing_window,
-    )
-    orchestrator.register_agent("Wandering", wandering_agent)
+    # Store rebuild function for WebSocket handler
+    ws.state.rebuild_orchestrator = rebuild_orchestrator
 
     _running = True
     frame_count = 0
@@ -268,6 +292,23 @@ async def _vision_loop(ws: WebSocket) -> None:
 
             # Run orchestrator on worst-case person
             agent_states = orchestrator.update(worst_features, any_detected)
+            
+            # Add unavailable/disabled agents for UI display
+            from .models import AgentState, AgentStateName
+            all_agent_names = ["FallGuard", "Seizure", "Stroke", "Wandering"]
+            registered_names = set(orchestrator._agents.keys())
+            
+            for agent_name in all_agent_names:
+                if agent_name not in registered_names:
+                    # Agent is disabled or unavailable
+                    unavailable_agent = AgentState(
+                        agent_name=agent_name,
+                        state=AgentStateName.NORMAL,
+                        confidence=0.0,
+                        summary="Agent currently disabled",
+                        available=False
+                    )
+                    agent_states.append(unavailable_agent)
             
             # Get FallGuard state for backward compatibility
             fallguard_state = None
@@ -345,6 +386,24 @@ async def websocket_endpoint(ws: WebSocket):
                     if 'orchestrator' in locals():
                         orchestrator.reset_all()
                     logger.info("All agents reset requested via WebSocket")
+                elif msg.get("type") == "toggle_agent":
+                    # Toggle agent on/off
+                    agent_name = msg.get("agent")
+                    enabled = msg.get("enabled", True)
+                    if agent_name in config.enabled_agents:
+                        config.enabled_agents[agent_name] = enabled
+                        logger.info(f"Agent {agent_name} toggled to {enabled}")
+                        
+                        # Rebuild orchestrator with new config
+                        if hasattr(ws.state, 'rebuild_orchestrator'):
+                            ws.state.rebuild_orchestrator()
+                        
+                        # Send confirmation
+                        await ws.send_json({
+                            "type": "agent_toggled",
+                            "agent": agent_name,
+                            "enabled": enabled
+                        })
                 elif msg.get("type") == "update_config":
                     config = AppConfig(**msg.get("config", {}))
                     logger.info(f"Config updated: {config}")

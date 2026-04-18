@@ -9,6 +9,7 @@ interface AgentCardProps {
 
 export default function AgentCard({ agentState, poseDetected }: AgentCardProps) {
   const confidencePct = Math.round(agentState.confidence * 100);
+  const isAvailable = agentState.available !== false; // Default to true if not specified
 
   // Agent-specific configuration
   const agentConfig = {
@@ -59,21 +60,54 @@ export default function AgentCard({ agentState, poseDetected }: AgentCardProps) 
   const timeAgo = Math.round((Date.now() - lastChange.getTime()) / 1000);
   const timeLabel = timeAgo < 60 ? `${timeAgo}s ago` : `${Math.floor(timeAgo / 60)}m ago`;
 
+  // Unavailable agent styling
+  if (!isAvailable) {
+    return (
+      <div className="glass-card p-4 opacity-60 relative overflow-hidden">
+        {/* Unavailable overlay */}
+        <div className="absolute top-2 right-2 z-10">
+          <span className="text-[10px] px-2 py-1 rounded-full font-semibold bg-slate-700/80 text-slate-400 border border-slate-600/50">
+            UNAVAILABLE
+          </span>
+        </div>
+        
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-slate-800/40 border border-slate-700/30 flex items-center justify-center">
+              <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={config.icon} />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-400 leading-none">{config.title}</h3>
+              <p className="text-[11px] text-slate-600 mt-0.5">{config.description}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary message */}
+        <div className="bg-slate-800/30 rounded-lg px-3 py-2 border border-slate-700/20">
+          <p className="text-[11px] text-slate-500 italic">{agentState.summary}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="glass-card p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/10 flex items-center justify-center">
+      <div className="flex items-start justify-between mb-4 gap-2">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/10 flex items-center justify-center flex-shrink-0">
             <svg className="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={config.icon} />
             </svg>
           </div>
-          <div>
+          <div className="min-w-0">
             <h3 className="text-sm font-semibold text-slate-200 leading-none">{config.title}</h3>
             <p className="text-[11px] text-slate-500 mt-0.5">{config.description}</p>
           </div>
         </div>
-        <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+        <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap flex-shrink-0 ${
           poseDetected
             ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
             : "bg-slate-800/60 text-slate-500 border border-slate-700/30"

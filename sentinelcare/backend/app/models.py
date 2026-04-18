@@ -68,6 +68,7 @@ class AgentState(BaseModel):
     timer_total: float = 10.0
     last_change: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     summary: str = "System operating normally."
+    available: bool = True  # NEW: indicates if agent is currently active
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +123,7 @@ class WanderingConfig(BaseModel):
     recovery_window: float = 20.0
     boundary_zone: Optional[dict] = None  # {"x_min": 0.1, "x_max": 0.9, "y_min": 0.1, "y_max": 0.9}
     exit_threshold: float = 5.0
-    pacing_threshold: int = 8
+    pacing_threshold: int = 20  # Increased from 8 to reduce false positives
     pacing_window: float = 30.0
 
 
@@ -133,6 +134,18 @@ class AppConfig(BaseModel):
     fall_confidence_threshold: float = 0.55
     show_pose_overlay: bool = True
     frame_skip: int = 0  # process every Nth frame (0 = every frame)
+    
+    # ML enhancement
+    use_ml_boost: bool = True  # Enable ML confidence boosting
+    ml_weight: float = 0.3  # Weight given to ML predictions (0-1)
+    
+    # Agent enable/disable flags
+    enabled_agents: dict[str, bool] = {
+        "FallGuard": True,
+        "Seizure": True,
+        "Stroke": True,
+        "Wandering": False,
+    }
     
     # Per-agent configuration blocks
     seizure_config: SeizureConfig = Field(default_factory=SeizureConfig)

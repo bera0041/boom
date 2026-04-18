@@ -14,6 +14,7 @@ export interface AgentState {
   timer_total: number;
   last_change: string;
   summary: string;
+  available?: boolean;  // NEW: indicates if agent is currently active (defaults to true)
 }
 
 export interface PoseFeatures {
@@ -115,6 +116,11 @@ export function useWebSocket(url: string) {
 
         if (msg.alert) {
           setLatestAlert(msg.alert);
+        }
+
+        // Handle agent toggle response
+        if (msg.type === "agent_toggled") {
+          console.log(`Agent ${msg.agent} toggled to ${msg.enabled}`);
         }
       } catch (e) {
         console.warn("[WS] Parse error:", e);
