@@ -192,7 +192,6 @@ export default function Dashboard() {
           <AgentCard agentState={agentState} poseDetected={poseDetected} />
           <RecoveryTimer agentState={agentState} />
           <AlertPanel alert={latestAlert} onAcknowledge={handleAcknowledge} />
-          <SecurityStatus connected={connected} />
           <FutureAgents />
         </div>
 
@@ -201,6 +200,11 @@ export default function Dashboard() {
       {/* Bottom: Event Log */}
       <div className="h-[200px] shrink-0">
         <EventLog events={events} />
+      </div>
+
+      {/* Security Status - Below Event Timeline */}
+      <div className="shrink-0">
+        <SecurityStatus connected={connected} />
       </div>
       </main>
     </>
