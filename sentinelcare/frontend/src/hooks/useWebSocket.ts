@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 // ---- Types matching backend models ----
 
 export interface AgentState {
+  agent_name: string;  // NEW: identifies which agent produced this state
   state: "normal" | "suspicious_event" | "monitoring_recovery" | "recovered" | "critical_alert";
   confidence: number;
   event_type: string;
@@ -51,7 +52,8 @@ export interface AlertData {
 export interface WSMessage {
   type: string;
   frame?: string;
-  agent_state?: AgentState;
+  agent_state?: AgentState;  // Backward compatibility: single agent state
+  agents?: AgentState[];     // NEW: multi-agent support
   features?: PoseFeatures;
   event?: EventData;
   alert?: AlertData;
@@ -68,6 +70,7 @@ export function useWebSocket(url: string) {
   const [connected, setConnected] = useState(false);
   const [frame, setFrame] = useState<string | null>(null);
   const [agentState, setAgentState] = useState<AgentState>({
+    agent_name: "FallGuard",
     state: "normal",
     confidence: 0,
     event_type: "none",
@@ -77,6 +80,7 @@ export function useWebSocket(url: string) {
     last_change: new Date().toISOString(),
     summary: "Waiting for connection...",
   });
+  const [agents, setAgents] = useState<AgentState[]>([]);  // NEW: all agent states
   const [features, setFeatures] = useState<PoseFeatures | null>(null);
   const [events, setEvents] = useState<EventData[]>([]);
   const [latestAlert, setLatestAlert] = useState<AlertData | null>(null);
@@ -100,6 +104,7 @@ export function useWebSocket(url: string) {
 
         if (msg.frame) setFrame(msg.frame);
         if (msg.agent_state) setAgentState(msg.agent_state);
+        if (msg.agents) setAgents(msg.agents);  // NEW: handle multi-agent states
         if (msg.features) setFeatures(msg.features);
         if (msg.pose_detected !== undefined) setPoseDetected(msg.pose_detected);
         if (msg.num_people !== undefined) setNumPeople(msg.num_people);
@@ -139,6 +144,11 @@ export function useWebSocket(url: string) {
   const sendMessage = useCallback((msg: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(msg));
+      
+      // Clear alert when reset_agent message is sent
+      if (msg.type === "reset_agent") {
+        setLatestAlert(null);
+      }
     }
   }, []);
 
@@ -146,6 +156,7 @@ export function useWebSocket(url: string) {
     connected,
     frame,
     agentState,
+    agents,  // NEW: expose all agent states
     features,
     events,
     latestAlert,

@@ -10,6 +10,36 @@ interface AgentCardProps {
 export default function AgentCard({ agentState, poseDetected }: AgentCardProps) {
   const confidencePct = Math.round(agentState.confidence * 100);
 
+  // Agent-specific configuration
+  const agentConfig = {
+    FallGuard: {
+      title: "FallGuard Agent",
+      description: "Fall / Collapse Detection",
+      icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+      confidenceLabel: "Fall Confidence"
+    },
+    Seizure: {
+      title: "Seizure Agent",
+      description: "Seizure / Repetitive Motion Detection",
+      icon: "M13 10V3L4 14h7v7l9-11h-7z",
+      confidenceLabel: "Repetition Score"
+    },
+    Stroke: {
+      title: "Stroke Agent", 
+      description: "Stroke / Asymmetric Motion Detection",
+      icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z",
+      confidenceLabel: "Asymmetry Score"
+    },
+    Wandering: {
+      title: "Wandering Agent",
+      description: "Wandering / Boundary Detection", 
+      icon: "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+      confidenceLabel: "Detection Score"
+    }
+  };
+
+  const config = agentConfig[agentState.agent_name as keyof typeof agentConfig] || agentConfig.FallGuard;
+
   // Confidence bar color
   const barColor =
     confidencePct >= 70
@@ -35,13 +65,12 @@ export default function AgentCard({ agentState, poseDetected }: AgentCardProps) 
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/10 flex items-center justify-center">
             <svg className="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={config.icon} />
             </svg>
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-slate-200 leading-none">FallGuard Agent</h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">Fall / Collapse Detection</p>
+            <h3 className="text-sm font-semibold text-slate-200 leading-none">{config.title}</h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">{config.description}</p>
           </div>
         </div>
         <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
@@ -56,7 +85,7 @@ export default function AgentCard({ agentState, poseDetected }: AgentCardProps) 
       {/* Confidence bar */}
       <div className="mb-4">
         <div className="flex justify-between text-[11px] mb-1.5">
-          <span className="text-slate-500 font-medium">Fall Confidence</span>
+          <span className="text-slate-500 font-medium">{config.confidenceLabel}</span>
           <span className="text-slate-300 font-mono font-semibold">{confidencePct}%</span>
         </div>
         <div className={`h-1.5 ${barBg} rounded-full overflow-hidden`}>

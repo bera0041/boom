@@ -28,6 +28,7 @@ export default function Dashboard() {
     connected,
     frame,
     agentState,
+    agents,  // NEW: all agent states
     events,
     latestAlert,
     poseDetected,
@@ -170,7 +171,22 @@ export default function Dashboard() {
           <AgentCard agentState={agentState} poseDetected={poseDetected} />
           <RecoveryTimer agentState={agentState} />
           <AlertPanel alert={latestAlert} onAcknowledge={handleAcknowledge} />
-          <FutureAgents />
+          
+          {/* Multi-Agent Cards */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-300 px-1">Agent Modules</h3>
+            {agents.length > 0 ? (
+              agents.map((agent) => (
+                <AgentCard 
+                  key={agent.agent_name} 
+                  agentState={agent} 
+                  poseDetected={poseDetected} 
+                />
+              ))
+            ) : (
+              <FutureAgents />
+            )}
+          </div>
         </div>
 
       </div>

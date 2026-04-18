@@ -16,6 +16,10 @@ from .agent import FallGuardAgent
 from .event_store import event_store
 from .features import FeatureExtractor
 from .models import AppConfig, WSMessage, AgentStateName, PoseFeatures
+from .orchestrator import AgentOrchestrator
+from .seizure_agent import SeizureAgent
+from .stroke_agent import StrokeAgent
+from .wandering_agent import WanderingAgent
 from .vision import PoseTracker, VideoCapture, frame_to_base64
 
 logging.basicConfig(level=logging.INFO)
@@ -141,8 +145,8 @@ async def stop_stream():
 
 @app.post("/agent/reset")
 async def reset_agent():
-    """Reset the agent to NORMAL state (useful after critical alert)."""
-    return {"status": "reset_requested"}
+    """Reset all agents to NORMAL state (useful after critical alert)."""
+    return {"status": "all_agents_reset"}
 
 
 # ---------------------------------------------------------------------------
@@ -175,10 +179,43 @@ async def _vision_loop(ws: WebSocket) -> None:
     tracker = PoseTracker()
     # Per-person feature extractors (keyed by person index)
     extractors: dict[int, FeatureExtractor] = {}
-    agent = FallGuardAgent(
+    
+    # Create AgentOrchestrator and register all agents
+    orchestrator = AgentOrchestrator()
+    
+    # Register FallGuardAgent for backward compatibility
+    fall_agent = FallGuardAgent(
         recovery_window=config.recovery_window,
         confidence_threshold=config.fall_confidence_threshold,
     )
+    orchestrator.register_agent("FallGuard", fall_agent)
+    
+    # Register specialized agents with their configurations
+    seizure_agent = SeizureAgent(
+        recovery_window=config.seizure_config.recovery_window,
+        confidence_threshold=config.seizure_config.confidence_threshold,
+        recovery_threshold=config.seizure_config.recovery_threshold,
+        history_window=config.seizure_config.history_window,
+    )
+    orchestrator.register_agent("Seizure", seizure_agent)
+    
+    stroke_agent = StrokeAgent(
+        recovery_window=config.stroke_config.recovery_window,
+        asymmetry_threshold=config.stroke_config.asymmetry_threshold,
+        motion_threshold=config.stroke_config.motion_threshold,
+        recovery_asymmetry_threshold=config.stroke_config.recovery_asymmetry_threshold,
+        recovery_motion_threshold=config.stroke_config.recovery_motion_threshold,
+    )
+    orchestrator.register_agent("Stroke", stroke_agent)
+    
+    wandering_agent = WanderingAgent(
+        recovery_window=config.wandering_config.recovery_window,
+        boundary_zone=config.wandering_config.boundary_zone,
+        exit_threshold=config.wandering_config.exit_threshold,
+        pacing_threshold=config.wandering_config.pacing_threshold,
+        pacing_window=config.wandering_config.pacing_window,
+    )
+    orchestrator.register_agent("Wandering", wandering_agent)
 
     _running = True
     frame_count = 0
@@ -229,17 +266,25 @@ async def _vision_loop(ws: WebSocket) -> None:
                 if idx >= num_people:
                     del extractors[idx]
 
-            # Run agent on worst-case person
-            agent_state = agent.update(worst_features, any_detected)
+            # Run orchestrator on worst-case person
+            agent_states = orchestrator.update(worst_features, any_detected)
+            
+            # Get FallGuard state for backward compatibility
+            fallguard_state = None
+            for state in agent_states:
+                if state.agent_name == "FallGuard":
+                    fallguard_state = state
+                    break
 
             # Encode frame
             b64_frame = frame_to_base64(annotated, quality=65)
 
-            # Build message
+            # Build message with multi-agent support
             msg = WSMessage(
                 type="frame_update",
                 frame=b64_frame,
-                agent_state=agent_state,
+                agent_state=fallguard_state,  # Backward compatibility
+                agents=agent_states,  # NEW: all agent states
                 features=worst_features,
                 pose_detected=any_detected,
                 num_people=num_people,
@@ -251,8 +296,9 @@ async def _vision_loop(ws: WebSocket) -> None:
                 msg.event = current_events[0]
                 last_event_count = len(current_events)
 
-            # If critical alert just triggered, include alert
-            if agent_state.state == AgentStateName.CRITICAL_ALERT:
+            # If any agent has critical alert, include alert
+            critical_alert_detected = any(state.state == AgentStateName.CRITICAL_ALERT for state in agent_states)
+            if critical_alert_detected:
                 latest = event_store.get_latest_alert()
                 if latest:
                     msg.alert = latest
@@ -295,7 +341,10 @@ async def websocket_endpoint(ws: WebSocket):
                 msg = json.loads(data)
 
                 if msg.get("type") == "reset_agent":
-                    logger.info("Agent reset requested via WebSocket")
+                    # Reset all agents via orchestrator
+                    if 'orchestrator' in locals():
+                        orchestrator.reset_all()
+                    logger.info("All agents reset requested via WebSocket")
                 elif msg.get("type") == "update_config":
                     config = AppConfig(**msg.get("config", {}))
                     logger.info(f"Config updated: {config}")

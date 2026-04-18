@@ -5,11 +5,12 @@ from __future__ import annotations
 import time
 from datetime import datetime, timezone
 
+from .agent_base import BaseAgent
 from .models import AgentState, AgentStateName, Event, Alert, PoseFeatures
 from .event_store import event_store
 
 
-class FallGuardAgent:
+class FallGuardAgent(BaseAgent):
     """Rule-based fall detection agent with recovery window escalation.
 
     States
@@ -21,15 +22,10 @@ class FallGuardAgent:
     """
 
     def __init__(self, recovery_window: float = 10.0, confidence_threshold: float = 0.55) -> None:
-        self.recovery_window = recovery_window
-        self.confidence_threshold = confidence_threshold
-
-        # Internal state
-        self._state = AgentStateName.NORMAL
-        self._confidence = 0.0
+        super().__init__(recovery_window, confidence_threshold)
+        
+        # FallGuard-specific state
         self._event_start: float | None = None
-        self._timer_start: float | None = None
-        self._last_change = time.time()
         self._location = "Living Room"
 
         # Baseline tracking
@@ -41,8 +37,12 @@ class FallGuardAgent:
         self._recovery_cooldown_until: float = 0.0
 
     # ------------------------------------------------------------------
-    # Public API
+    # Public API (BaseAgent implementation)
     # ------------------------------------------------------------------
+    
+    def get_agent_name(self) -> str:
+        """Return the agent's display name."""
+        return "FallGuard"
 
     def update(self, features: PoseFeatures, pose_detected: bool) -> AgentState:
         """Process one frame's features and return updated agent state."""
@@ -63,7 +63,7 @@ class FallGuardAgent:
         if self._state == AgentStateName.NORMAL:
             if now < self._recovery_cooldown_until:
                 pass  # cooldown period after recovery
-            elif fall_confidence >= self.confidence_threshold:
+            elif fall_confidence >= self._confidence_threshold:
                 self._transition(AgentStateName.SUSPICIOUS_EVENT, fall_confidence, now)
                 self._event_start = now
                 self._frames_since_suspicious = 0
@@ -72,12 +72,12 @@ class FallGuardAgent:
             self._frames_since_suspicious += 1
             self._confidence = max(self._confidence, fall_confidence)
             # Confirm after a few frames of sustained suspicious signal
-            if self._frames_since_suspicious >= 3 and self._confidence >= self.confidence_threshold:
+            if self._frames_since_suspicious >= 3 and self._confidence >= self._confidence_threshold:
                 self._transition(AgentStateName.MONITORING_RECOVERY, self._confidence, now)
                 self._timer_start = now
                 self._log_event("collapse_suspected", "monitoring_recovery",
                                 "Possible collapse detected. Monitoring for recovery.")
-            elif fall_confidence < self.confidence_threshold * 0.5:
+            elif fall_confidence < self._confidence_threshold * 0.5:
                 # False alarm
                 self._transition(AgentStateName.NORMAL, 0.0, now)
 
@@ -90,11 +90,11 @@ class FallGuardAgent:
                 self._log_event("collapse_recovered", "recovered",
                                 f"Subject recovered after {elapsed:.1f}s.")
                 self._recovery_cooldown_until = now + 3.0
-            elif elapsed >= self.recovery_window:
+            elif elapsed >= self._recovery_window:
                 self._transition(AgentStateName.CRITICAL_ALERT, self._confidence, now)
                 evt = self._log_event(
                     "collapse_no_recovery", "critical_alert",
-                    f"No recovery detected within {self.recovery_window:.0f}s window. "
+                    f"No recovery detected within {self._recovery_window:.0f}s window. "
                     "Subject remains in dangerous position.",
                     recommended_action="Notify caregiver / emergency contact",
                     elapsed=elapsed,
@@ -223,12 +223,13 @@ class FallGuardAgent:
         }
 
         return AgentState(
+            agent_name=self.get_agent_name(),
             state=self._state,
             confidence=round(self._confidence, 3),
             event_type="fall_collapse" if self._state != AgentStateName.NORMAL else "none",
             timer_active=timer_active,
             timer_remaining=round(timer_remaining, 1),
-            timer_total=self.recovery_window,
+            timer_total=self._recovery_window,
             last_change=datetime.fromtimestamp(self._last_change, tz=timezone.utc).isoformat(),
             summary=summaries.get(self._state, ""),
         )
@@ -246,7 +247,7 @@ class FallGuardAgent:
             status=status,
             confidence=round(self._confidence, 3),
             location=self._location,
-            recovery_window_seconds=self.recovery_window,
+            recovery_window_seconds=self._recovery_window,
             elapsed_seconds=round(elapsed, 1),
             summary=summary,
             recommended_action=recommended_action,

@@ -47,6 +47,11 @@ class PoseFeatures(BaseModel):
     motion_energy: float = 0.0
     stillness_score: float = 0.0
     ground_proximity: float = 0.0
+    
+    # New features for Phase 3 agents
+    repetition_score: float = 0.0  # For SeizureAgent
+    asymmetry_score: float = 0.0   # For StrokeAgent
+    body_centroid_x: float = 0.0   # For WanderingAgent
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +59,7 @@ class PoseFeatures(BaseModel):
 # ---------------------------------------------------------------------------
 
 class AgentState(BaseModel):
+    agent_name: str = "Unknown"  # NEW: identifies which agent produced this state
     state: AgentStateName = AgentStateName.NORMAL
     confidence: float = 0.0
     event_type: str = "none"
@@ -94,6 +100,32 @@ class Alert(BaseModel):
 # Config
 # ---------------------------------------------------------------------------
 
+class SeizureConfig(BaseModel):
+    """Configuration for SeizureAgent."""
+    recovery_window: float = 10.0
+    confidence_threshold: float = 0.65
+    recovery_threshold: float = 0.30
+    history_window: int = 60
+
+
+class StrokeConfig(BaseModel):
+    """Configuration for StrokeAgent."""
+    recovery_window: float = 15.0
+    asymmetry_threshold: float = 0.15
+    motion_threshold: float = 0.01
+    recovery_asymmetry_threshold: float = 0.10
+    recovery_motion_threshold: float = 0.02
+
+
+class WanderingConfig(BaseModel):
+    """Configuration for WanderingAgent."""
+    recovery_window: float = 20.0
+    boundary_zone: Optional[dict] = None  # {"x_min": 0.1, "x_max": 0.9, "y_min": 0.1, "y_max": 0.9}
+    exit_threshold: float = 5.0
+    pacing_threshold: int = 8
+    pacing_window: float = 30.0
+
+
 class AppConfig(BaseModel):
     video_source: str = "0"  # "0" for webcam, or path to video file
     recovery_window: float = 10.0  # seconds
@@ -101,6 +133,11 @@ class AppConfig(BaseModel):
     fall_confidence_threshold: float = 0.55
     show_pose_overlay: bool = True
     frame_skip: int = 0  # process every Nth frame (0 = every frame)
+    
+    # Per-agent configuration blocks
+    seizure_config: SeizureConfig = Field(default_factory=SeizureConfig)
+    stroke_config: StrokeConfig = Field(default_factory=StrokeConfig)
+    wandering_config: WanderingConfig = Field(default_factory=WanderingConfig)
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +147,8 @@ class AppConfig(BaseModel):
 class WSMessage(BaseModel):
     type: str  # "frame_update", "agent_update", "event", "alert"
     frame: Optional[str] = None  # base64 JPEG
-    agent_state: Optional[AgentState] = None
+    agent_state: Optional[AgentState] = None  # Backward compatibility: single agent state
+    agents: list[AgentState] = Field(default_factory=list)  # NEW: multi-agent support
     features: Optional[PoseFeatures] = None
     event: Optional[Event] = None
     alert: Optional[Alert] = None
