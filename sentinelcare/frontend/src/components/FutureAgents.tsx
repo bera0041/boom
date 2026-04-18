@@ -63,6 +63,23 @@ const FUTURE_AGENTS = [
     border: "border-blue-500/15",
     glow: "group-hover:shadow-[0_0_12px_rgba(59,130,246,0.1)]",
   },
+  {
+    name: "Fever Detection",
+    description: "Thermal camera body temperature monitoring",
+    status: "Soon",
+    icon: (
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.75-2.75L13.04 4.5a2 2 0 00-3.5 0L1.82 16.25A2 2 0 003.56 19h1.51" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M9 21v-4a3 3 0 016 0v4" />
+      </svg>
+    ),
+    color: "text-red-400",
+    bg: "bg-red-500/[0.06]",
+    border: "border-red-500/15",
+    glow: "group-hover:shadow-[0_0_12px_rgba(239,68,68,0.1)]",
+  },
 ];
 
 export default function FutureAgents() {
