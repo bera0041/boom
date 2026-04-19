@@ -28,13 +28,26 @@ export default function EmergencyAlertModal({
   const { settings } = useUserSettings();
   const { contacts } = useEmergencyContacts();
   const { location } = useUserLocation();
-  const { dispatching, dispatchAlert, fetchNearestHospital } = useAlertDispatch();
+  const { 
+    dispatching, 
+    dispatchAlert, 
+    fetchNearestHospital,
+    requestNotificationPermission,
+    notificationPermission,
+  } = useAlertDispatch();
 
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
   const [isCancelled, setIsCancelled] = useState(false);
   const [isDispatched, setIsDispatched] = useState(false);
   const [dispatchResult, setDispatchResult] = useState<any>(null);
   const [nearestHospital, setNearestHospital] = useState<any>(null);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if (isOpen && notificationPermission === 'default') {
+      requestNotificationPermission();
+    }
+  }, [isOpen, notificationPermission, requestNotificationPermission]);
 
   // Fetch nearest hospital on open
   useEffect(() => {
@@ -118,9 +131,9 @@ export default function EmergencyAlertModal({
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg mx-4 bg-slate-900 border border-red-500/50 rounded-2xl shadow-2xl shadow-red-500/20 overflow-hidden">
+      <div className="relative w-full max-w-lg mx-4 bg-slate-900 border border-red-500/50 rounded-2xl shadow-2xl shadow-red-500/20 overflow-hidden max-h-[90vh] overflow-y-auto">
         {/* Pulsing border effect */}
-        <div className="absolute inset-0 rounded-2xl border-2 border-red-500 animate-pulse opacity-50" />
+        <div className="absolute inset-0 rounded-2xl border-2 border-red-500 animate-pulse opacity-50 pointer-events-none" />
 
         {/* Header */}
         <div className="relative bg-red-500/20 p-6 border-b border-red-500/30">
@@ -216,38 +229,103 @@ export default function EmergencyAlertModal({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-bold text-slate-200 mb-2">Alert Dispatched</h3>
-                <p className="text-slate-400">Emergency services have been notified.</p>
+                <h3 className="text-xl font-bold text-slate-200 mb-2">Alert Prepared</h3>
+                <p className="text-slate-400 text-sm">Click the buttons below to contact emergency services</p>
               </div>
 
-              {/* Dispatch Summary */}
-              <div className="space-y-2 p-4 rounded-lg bg-slate-800/50 border border-slate-700">
-                {dispatchResult?.notified911 && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-slate-300">911 Emergency Services notified</span>
+              {/* 911 Emergency Button */}
+              {dispatchResult?.notified911 && (
+                <a
+                  href="tel:911"
+                  className="flex items-center justify-center gap-3 w-full px-4 py-4 rounded-lg bg-red-500 text-white font-bold hover:bg-red-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  CALL 911
+                </a>
+              )}
+
+              {/* Email Contacts */}
+              {dispatchResult?.emailLinks?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Email Emergency Contacts:</p>
+                  {dispatchResult.emailLinks.map((link: any, idx: number) => (
+                    <a
+                      key={idx}
+                      href={link.mailtoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between w-full px-4 py-3 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <span className="font-medium">{link.name}</span>
+                      </div>
+                      <span className="text-xs text-amber-400/70">{link.email}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {/* Phone Contacts */}
+              {dispatchResult?.phoneLinks?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Call Emergency Contacts:</p>
+                  {dispatchResult.phoneLinks.map((link: any, idx: number) => (
+                    <a
+                      key={idx}
+                      href={link.telUrl}
+                      className="flex items-center justify-between w-full px-4 py-3 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                        <span className="font-medium">{link.name}</span>
+                      </div>
+                      <span className="text-xs text-emerald-400/70">{link.phone}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {/* Hospital Contact */}
+              {dispatchResult?.hospitalLink && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Nearest Hospital:</p>
+                  <div className="p-4 rounded-lg bg-cyan-500/20 border border-cyan-500/30">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium text-cyan-300">{dispatchResult.hospitalLink.name}</p>
+                        {dispatchResult.hospitalLink.phone && (
+                          <a 
+                            href={dispatchResult.hospitalLink.telUrl}
+                            className="text-sm text-cyan-400 hover:text-cyan-300 flex items-center gap-1 mt-1"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                            </svg>
+                            {dispatchResult.hospitalLink.phone}
+                          </a>
+                        )}
+                      </div>
+                      <svg className="w-8 h-8 text-cyan-400/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
                   </div>
-                )}
-                {dispatchResult?.notifiedContacts?.length > 0 && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-slate-300">
-                      {dispatchResult.notifiedContacts.length} emergency contact{dispatchResult.notifiedContacts.length > 1 ? 's' : ''} notified
-                    </span>
-                  </div>
-                )}
-                {dispatchResult?.notifiedHospital && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-slate-300">{dispatchResult.notifiedHospital.name} alerted</span>
-                  </div>
-                )}
+                </div>
+              )}
+
+              {/* Alert logged notice */}
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-800/50 text-slate-400 text-xs">
+                <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Alert logged to history at {new Date().toLocaleTimeString()}
               </div>
 
               {/* Close button */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { UserSettings } from './useUserSettings';
 import { EmergencyContact } from './useEmergencyContacts';
@@ -27,12 +27,70 @@ interface DispatchResult {
   notifiedContacts: EmergencyContact[];
   notifiedHospital: Hospital | null;
   alertId?: string;
+  // New: Links for user to click
+  emailLinks: Array<{ name: string; email: string; mailtoUrl: string }>;
+  phoneLinks: Array<{ name: string; phone: string; telUrl: string }>;
+  hospitalLink: { name: string; phone?: string; telUrl?: string } | null;
 }
 
 export function useAlertDispatch() {
   const [dispatching, setDispatching] = useState(false);
   const [lastDispatch, setLastDispatch] = useState<DispatchResult | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const supabase = createClient();
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  // Request browser notification permission
+  const requestNotificationPermission = useCallback(async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return false;
+    }
+
+    if (Notification.permission === 'granted') {
+      setNotificationPermission('granted');
+      return true;
+    }
+
+    if (Notification.permission !== 'denied') {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      return permission === 'granted';
+    }
+
+    return false;
+  }, []);
+
+  // Send browser notification
+  const sendBrowserNotification = useCallback((title: string, body: string, tag?: string) => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return;
+    }
+
+    if (Notification.permission === 'granted') {
+      const notification = new Notification(title, {
+        body,
+        icon: '/sentinel-icon.png',
+        badge: '/sentinel-badge.png',
+        tag: tag || 'sentinelcare-alert',
+        requireInteraction: true,
+        vibrate: [200, 100, 200, 100, 200],
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+
+      // Auto-close after 30 seconds
+      setTimeout(() => notification.close(), 30000);
+    }
+  }, []);
 
   // Fetch nearest hospital based on location
   const fetchNearestHospital = useCallback(async (lat: number, lng: number): Promise<Hospital | null> => {
@@ -67,6 +125,9 @@ export function useAlertDispatch() {
       notified911: false,
       notifiedContacts: [],
       notifiedHospital: null,
+      emailLinks: [],
+      phoneLinks: [],
+      hospitalLink: null,
     };
 
     try {
@@ -82,32 +143,65 @@ export function useAlertDispatch() {
         );
       }
 
-      // Simulate notifications (in production, these would be real API calls)
-      
-      // 1. Notify 911
+      // Send browser notification immediately
+      sendBrowserNotification(
+        `EMERGENCY: ${alertInfo.type}`,
+        `Critical alert detected at ${alertInfo.timestamp.toLocaleTimeString()}. ${location?.home_address || 'Location unknown'}`,
+        `alert-${Date.now()}`
+      );
+
+      // Prepare alert payload for API
+      const payload = {
+        alertType: alertInfo.type,
+        severity: alertInfo.severity,
+        timestamp: alertInfo.timestamp.toISOString(),
+        location: location ? {
+          address: location.home_address,
+          latitude: location.latitude ? Number(location.latitude) : undefined,
+          longitude: location.longitude ? Number(location.longitude) : undefined,
+        } : undefined,
+        contacts: contacts.map(c => ({
+          name: c.name,
+          email: c.email || undefined,
+          phone: c.phone,
+        })),
+        notify911: settings?.notify_911 || false,
+        notifyHospital: settings?.notify_nearest_hospital || false,
+        nearestHospital: nearestHospital ? {
+          name: nearestHospital.name,
+          address: nearestHospital.address,
+          phone: nearestHospital.phone,
+        } : undefined,
+      };
+
+      // Call API to generate mailto/tel links
+      const response = await fetch('/api/send-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        result.emailLinks = data.dispatched.emailContacts || [];
+        result.phoneLinks = data.dispatched.phoneContacts || [];
+        if (data.dispatched.hospital) {
+          result.hospitalLink = {
+            name: data.dispatched.hospital.name,
+            phone: data.dispatched.hospital.phone,
+            telUrl: data.dispatched.hospital.telUrl,
+          };
+        }
+      }
+
+      // Update result flags
       if (settings?.notify_911) {
-        // In production: Integrate with emergency services API
-        console.log('[ALERT DISPATCH] Notifying 911:', {
-          location: location?.home_address,
-          issue: alertInfo.type,
-          time: alertInfo.timestamp.toISOString(),
-        });
         result.notified911 = true;
       }
-
-      // 2. Notify emergency contacts
       if (settings?.notify_emergency_contacts && contacts.length > 0) {
-        // In production: Send SMS/calls via Twilio or similar
-        for (const contact of contacts) {
-          console.log('[ALERT DISPATCH] Notifying contact:', contact.name, contact.phone);
-        }
         result.notifiedContacts = contacts;
       }
-
-      // 3. Notify nearest hospital
       if (settings?.notify_nearest_hospital && nearestHospital) {
-        // In production: Send alert to hospital emergency system
-        console.log('[ALERT DISPATCH] Notifying hospital:', nearestHospital.name, nearestHospital.phone);
         result.notifiedHospital = nearestHospital;
       }
 
@@ -123,7 +217,7 @@ export function useAlertDispatch() {
           longitude: location?.longitude || null,
           triggered_at: alertInfo.timestamp.toISOString(),
           notified_911: result.notified911,
-          notified_contacts: result.notifiedContacts.map(c => ({ name: c.name, phone: c.phone })),
+          notified_contacts: result.notifiedContacts.map(c => ({ name: c.name, phone: c.phone, email: c.email })),
           notified_hospital: result.notifiedHospital?.name || null,
           status: 'dispatched',
         })
@@ -145,7 +239,7 @@ export function useAlertDispatch() {
     } finally {
       setDispatching(false);
     }
-  }, [supabase, fetchNearestHospital]);
+  }, [supabase, fetchNearestHospital, sendBrowserNotification]);
 
   // Cancel/acknowledge an alert
   const acknowledgeAlert = useCallback(async (alertId: string) => {
@@ -164,11 +258,26 @@ export function useAlertDispatch() {
     }
   }, [supabase]);
 
+  // Open email client for a contact
+  const openEmailForContact = useCallback((mailtoUrl: string) => {
+    window.open(mailtoUrl, '_blank');
+  }, []);
+
+  // Open phone dialer for a contact
+  const openPhoneForContact = useCallback((telUrl: string) => {
+    window.location.href = telUrl;
+  }, []);
+
   return {
     dispatching,
     lastDispatch,
     dispatchAlert,
     acknowledgeAlert,
     fetchNearestHospital,
+    notificationPermission,
+    requestNotificationPermission,
+    sendBrowserNotification,
+    openEmailForContact,
+    openPhoneForContact,
   };
 }
